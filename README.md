@@ -7,5 +7,5 @@ To run the experiment, call
 After models are trained, call 
 "bash test.sh [small/large] [full/ablation]"
 
-Simplified pricing example
+Simplified pricing example:
 To quickly experiment with RL methods, run `python simple_train.py --algo TD3 --timesteps 10000`.\nAlgorithms TD3, PPO and SAC from Stable-Baselines3 are supported.
