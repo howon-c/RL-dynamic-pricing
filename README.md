@@ -8,3 +8,4 @@ After models are trained, call
 "bash test.sh [small/large] [full/ablation]"
 
 The inputs of the NYC scenario can be found at https://drive.google.com/drive/folders/1IVQUZXHgDQMe1IrVX2A60bidymF0Ccbq?usp=share_link.
+\n## Simplified pricing example\nTo quickly experiment with RL methods, run `python simple_train.py --algo TD3 --timesteps 10000`.\nAlgorithms TD3, PPO and SAC from Stable-Baselines3 are supported.
