@@ -3,7 +3,7 @@ import torch
 from collections import namedtuple, deque
 from random import sample
 from lapsolver import solve_dense
-from pricer import TD3_MLP, TD3_CNN_deep, PPO_MLP, PPO_CNN_deep
+from pricer import TD3_MLP, TD3_CNN_deep, PPO_MLP, PPO_CNN_deep, SAC_MLP, SAC_CNN
 import pickle
 from scipy.optimize import linprog
 
@@ -59,6 +59,24 @@ class Platform:
             self.pricer = PPO_MLP(num_zone, max_waiting, max(max_waiting // update_freq, 1), max_step + 1,
                                   actor_lr=actor_lr, critic_lr=critic_lr,
                                   writer=writer, position_encode = position_encode, max_len = T_train)
+        elif option == 'SAC_CNN':
+            if od_permutation:
+                self.pricer = SAC_CNN(num_zone, max(max_waiting//update_freq, 1), max_step + 1, 2*max_waiting,
+                                       kernel_size, stride, max(permutation[0])+1,
+                                       max(permutation[1])+1, pooling = pooling, actor_lr = actor_lr, critic_lr = critic_lr,
+                                       writer = writer, position_encode = position_encode, forget = forget,
+                                       max_len = T_train)
+            else:
+                self.pricer = SAC_CNN(num_zone, max(max_waiting//update_freq, 1), max_step + 1, max_waiting,
+                                       kernel_size, stride, num_zone, num_zone,
+                                       pooling = pooling, actor_lr = actor_lr, critic_lr = critic_lr,
+                                       writer = writer, position_encode = position_encode, forget = forget,
+                                       max_len = T_train)
+        elif option == 'SAC_MLP':
+            self.pricer = SAC_MLP(num_zone, max_waiting, max(max_waiting//update_freq, 1), max_step + 1,
+                                 actor_lr = actor_lr, critic_lr = critic_lr,
+                                 writer = writer, position_encode = position_encode, forget = forget,
+                                 max_len = T_train)
         elif option == 'TD3_CNN':
             if od_permutation:
                 self.pricer = TD3_CNN_deep(num_zone, max(max_waiting//update_freq, 1), max_step + 1, 2*max_waiting, \
@@ -77,7 +95,7 @@ class Platform:
                                    writer = writer, policy_delay = policy_delay, position_encode = position_encode, forget = forget,\
                                   max_len = T_train)
         print(option)
-        if option.startswith('TD3'):
+        if option.startswith('TD3') or option.startswith('SAC'):
             self.buffer = Memory(size = (10*T_train)//update_freq, device=device)
         else:
             self.buffer = Memory(size = T_train//update_freq * 2, device=device)
@@ -102,7 +120,7 @@ class Platform:
         self.action_std_decay_rate = 0.01
         self.min_action_std = 0.1
 
-        if option.startswith('PPO'):
+        if option.startswith('PPO') or option.startswith('SAC'):
             self.pricer.set_action_std(self.action_std)
 
         # For permutation
@@ -371,8 +389,10 @@ class Platform:
     #     self.pricer.update_value(epoches, batch_size, self.buffer)
         
     def train_pricing_policy(self, iter, thresholds, batch_size = 32, update_frequency = 1):
-        if thresholds <= len(self.buffer):
-            self.pricer.update_policy(batch_size, self.buffer, iter, update_freq = update_frequency)
+        """Train the pricing policy when enough samples are available."""
+        if len(self.buffer) >= max(thresholds, batch_size):
+            self.pricer.update_policy(batch_size, self.buffer, iter,
+                                      update_freq=update_frequency)
 
 
     def decay_searching_variance(self):
@@ -381,6 +401,9 @@ class Platform:
             self.pricer.set_action_std(self.action_std)
         elif self.option.startswith('TD3'):
             self.epsilon = max(self.epsilon * self.alpha, self.epsilon_min)
+        elif self.option.startswith('SAC'):
+            self.action_std = max(self.action_std - self.action_std_decay_rate, self.min_action_std)
+            self.pricer.set_action_std(self.action_std)
 
 
 
